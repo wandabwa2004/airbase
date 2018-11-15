@@ -1,5 +1,6 @@
 import os
 import sys
+import multiprocessing.dummy as mp
 
 import requests
 import tqdm
@@ -264,6 +265,7 @@ class AirbaseRequest:
         update_date=None,
         verbose=True,
         preload_csv_links=False,
+        n_jobs=1,
     ):
         """
         Handler for Airbase data requests.
@@ -305,6 +307,7 @@ class AirbaseRequest:
         self.source = source
         self.update_date = update_date
         self.verbose = verbose
+        self.n_jobs = n_jobs
 
         self._country_list = util.string_safe_list(country)
         self._plshort_list = util.string_safe_list(plshort)
@@ -386,21 +389,34 @@ class AirbaseRequest:
         if self.verbose:
             print("Downloading CSVs to {}...".format(dir), file=sys.stderr)
 
-        for url in tqdm.tqdm(
-            self._csv_links, disable=not self.verbose, leave=True
-        ):
-            # filepath matches filenmae in url
+        pbar = tqdm.tqdm(
+            total=len(self._csv_links), disable=not self.verbose, leave=True,
+        )
+
+        def download(url):
+            # filepath matches filename in url
             fpath = os.path.join(dir, os.path.basename(url))
 
             # skip before downloading if we already have the file
             if os.path.exists(fpath) and skip_existing:
-                continue
+                pbar.update()
+                return
 
             r = requests.get(url)
-            r.raise_for_status()
+
+            if not r.text:
+                pbar.update()
+                return
 
             with open(fpath, "w") as h:
                 h.write(r.text)
+
+            pbar.update()
+
+        with mp.Pool(self.n_jobs) as p:
+            p.imap_unordered(download, self._csv_links)
+            p.close()
+            p.join()
 
         return self
 

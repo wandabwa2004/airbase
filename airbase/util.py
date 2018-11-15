@@ -1,6 +1,5 @@
 import datetime
 
-from .models import Pollutant
 from .resources import (
     LINK_LIST_URL_TEMPLATE,
     CURRENT_YEAR,
@@ -52,18 +51,17 @@ def pollutants_per_country(summary):
 
     :param list[dict] summary: The E1a summary.
 
-    :return dict[list[Pollutant]]: All available pollutants per country.
+    :return dict[list[dict]]: All available pollutants per country.
     """
     output = dict()
 
     for d in summary.copy():
         country = d.pop("ct")
-        pol = Pollutant(**d)
 
         if country in output:
-            output[country].append(pol)
+            output[country].append(d)
         else:
-            output[country] = [pol]
+            output[country] = [d]
 
     return output
 
